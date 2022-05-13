@@ -1,4 +1,4 @@
-module github.com/unRob/coredns-consul
+module github.com/cbpowell/coredns-consul
 
 go 1.13
 
