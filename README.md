@@ -40,6 +40,7 @@ consul_catalog [TAGS...] {
 * `acl_metadata_tag` specifies the tag to read acl rules from, by default `coredns-acl`. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance on the corresponding service's metatag.
 * `acl_zone` adds a zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
 * `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead.
+* `alias_tag` If specified, services tagged with **ALIAS_TAG**=[comma-separated list of services aliases] will also be accessible via the specified aliases.
 * `config_kv_path` If specified, consul's kv store will be queried for **CONSUL_KV_PATH** and specified entries will be served before querying for catalog records. The value at **CONSUL_KV_PATH** must contain json in following this schema:
     ```jsonc
     {
@@ -63,8 +64,7 @@ This plugin reports readiness to the ready plugin. This will happen after it has
 
 Handle all the queries in the `example.com` zone, first by looking into hosts, then consul, and finally a zone file. Queries for services in the catalog at `consul.service.consul:8500` with a `coredns.enabled` tag will be answered with the addresses for `$SERVICE_NAME.services.consul`. If the service also includes a `traefik.enabled` tag, queries will be answered with the addresses for `traefik.service.consul`.
 
-~~~ txt
-
+```
 example.com {
     hosts {
         10.0.0.42 fourtytwo.example.com
@@ -72,9 +72,23 @@ example.com {
     }
 
     consul_catalog coredns.enabled {
-        address consul.service.consul:8500
+        endpoint consul.service.consul:8500
+        
+        // Token needs read access to services and nodes
         token CONSUL_ACL_TOKEN
+        
+        // Use coredns-consul metadata tag to define ACL (like "allow trusted")
         acl_metada_tag coredns-consul
+        
+        // Use traefik as service proxy, looking for same tag used to enable traefik
+        service_proxy traefik.enable=true traefik
+        
+        // Specify alias tags
+        // Services needs associated tag with list of aliases, i.e "coredns.alias=alias1,alias2"
+        // Allowing access via "alias1.example.com" and "alias2.example.com"
+        alias_tag coredns.alias
+        
+        // Define ACLs
         acl_zone trusted 10.0.0.0/24
         acl_zone guests 192.168.10.0/24
         acl_zone iot 192.168.20.0/24
@@ -85,6 +99,7 @@ example.com {
     file zones/example.com
 }
 
+// This zone needs to be retained for coredns-consul to work!
 consul {
     # Forward all requests to consul
     forward . 10.0.0.42:8600 10.0.0.43:8600 10.0.0.44:8600 {
@@ -97,4 +112,4 @@ consul {
     errors
     cache
 }
-~~~
+```
