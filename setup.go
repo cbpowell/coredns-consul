@@ -13,7 +13,9 @@ import (
 
 var Log = clog.NewWithPlugin("consul_catalog")
 
-func init() { plugin.Register("consul_catalog", setup) }
+func init() {
+	plugin.Register("consul_catalog", setup)
+}
 
 func setup(c *caddy.Controller) error {
 	catalog, err := parse(c)
@@ -80,6 +82,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 	token := ""
 	networks := map[string]*net.IPNet{}
 	for c.Next() {
+
 		tags := c.RemainingArgs()
 		if len(tags) > 0 {
 			cc.Tag = tags[0]
@@ -133,6 +136,12 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 				cc.ProxyTag = remaining[0]
 				cc.ProxyService = remaining[1]
 				Log.Debugf("Found proxy config for tag %s and service %s", cc.ProxyTag, cc.ProxyService)
+			case "alias_tag":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+				cc.AliasTag = c.Val()
+				Log.Debugf("Found alias tag config for tag %s", cc.AliasTag)
 			case "config_kv_path":
 				if !c.NextArg() {
 					return nil, c.ArgErr()

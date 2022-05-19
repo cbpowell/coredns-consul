@@ -8,6 +8,11 @@
 
 This plugin reads services from the [Consul Catalog](https://www.consul.io/api/catalog.html#list-services), and serves A records to them if tagged with specified tags.
 
+## Build
+Add to `plugin.cfg` with:
+~~~
+consul_catalog:github.com/cbpowell/coredns-consul
+~~~
 
 ## Syntax
 
@@ -24,6 +29,7 @@ consul_catalog [TAGS...] {
     acl_metadata_tag META_TAG
     acl_zone ZONE_NAME ZONE_CIDR
     service_proxy PROXY_TAG PROXY_SERVICE
+    alias_tag ALIAS_TAG
     config_kv_path CONSUL_KV_PATH
     ttl TTL
 }

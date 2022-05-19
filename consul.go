@@ -172,20 +172,33 @@ func (c *Catalog) FetchServices() error {
 	for svc, serviceTags := range svcs {
 		target := svc
 		exposed := false
-
+		aliases := []string{}
 		for _, tag := range serviceTags {
 			switch tag {
 			case c.ProxyTag:
 				if c.ProxyTag != "" {
+					Log.Debugf("%s has a proxy tag, would provide proxy as target", svc)
 					target = c.ProxyService
 				}
 			case c.Tag:
+				Log.Debugf("CoreDNS exposure is enabled for %s", svc)
 				exposed = true
+			default:
+				// Look for alias tag definitions
+				possibleAlias := strings.Split(tag, "=")
+				if strings.TrimSpace(possibleAlias[0]) == c.AliasTag {
+					for _, atag := range strings.Split(possibleAlias[1], ",") {
+						cAtag := strings.TrimSpace(atag)
+						Log.Debugf("Found alias %s for service %s", cAtag, svc)
+						aliases = append(aliases, cAtag)
+					}
+				}
 			}
 		}
 
 		// do not publish services without the tag
 		if !exposed {
+			Log.Debugf("%s has neither proxy tag or direct exposure tag, not exposing", svc)
 			continue
 		}
 
@@ -235,7 +248,13 @@ func (c *Catalog) FetchServices() error {
 			Log.Warningf("No services found for %s, check the permissions for your token", svc)
 		}
 
+		// Add main service
 		currentServices[svc] = service
+		// Add aliases to service
+		for _, alias := range aliases {
+			currentServices[alias] = service
+		}
+
 		found = append(found, svc)
 	}
 
