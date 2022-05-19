@@ -13,6 +13,7 @@ Add to `plugin.cfg` with:
 ~~~
 consul_catalog:github.com/cbpowell/coredns-consul
 ~~~
+And then follow [CoreDNS custom build instructions](https://coredns.io/2017/07/25/compile-time-enabling-or-disabling-plugins/).
 
 ## Syntax
 
