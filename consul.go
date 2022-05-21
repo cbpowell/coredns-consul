@@ -218,43 +218,44 @@ func (c *Catalog) FetchServices() error {
 			ACL:    []*ServiceACL{},
 		}
 
-		if len(hydratedServices) > 0 {
+		if len(hydratedServices) < 1 {
+			Log.Warningf("No services found for %s, check the permissions for your token", svc)
+		} else {
 			metadata := hydratedServices[0].ServiceMeta
 			acl, exists := metadata[c.MetadataTag]
 			if !exists {
+				// No ACL for service
 				if acl_ignore {
-					Log.Infof("Configured to ignore ACL for %s", svc)
+					Log.Infof("Configured to ignore ACL for service %s", svc)
 				} else {
-					Log.Warningf("No ACL found for %s, will not expose", svc)
+					Log.Warningf("No ACL found for service %s, will not expose", svc)
 					// Continue to next service
 					continue
 				}
-			}
+			} else {
+				// Parse ACLs
+				Log.Debugf("Parsing ACL for %s : %s", svc, acl)
 
-			Log.Debugf("Parsing ACL for %s : %s", svc, acl)
-
-			aclRules := regexp.MustCompile(`;\s*`).Split(acl, -1)
-			for _, rule := range aclRules {
-				ruleParts := strings.SplitN(rule, " ", 2)
-				if len(ruleParts) != 2 {
-					Log.Warningf("Ignoring service. Failed parsing acl rule <%s> for service %s", rule, svc)
-					continue
-				}
-				action := ruleParts[0]
-				for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
-					if cidr, ok := c.Networks[networkName]; ok {
-						service.ACL = append(service.ACL, &ServiceACL{
-							Action:  action,
-							Network: cidr,
-						})
-					} else {
-						Log.Warningf("unknown network %s", networkName)
+				aclRules := regexp.MustCompile(`;\s*`).Split(acl, -1)
+				for _, rule := range aclRules {
+					ruleParts := strings.SplitN(rule, " ", 2)
+					if len(ruleParts) != 2 {
+						Log.Warningf("Ignoring service. Failed parsing acl rule <%s> for service %s", rule, svc)
+						continue
+					}
+					action := ruleParts[0]
+					for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
+						if cidr, ok := c.Networks[networkName]; ok {
+							service.ACL = append(service.ACL, &ServiceACL{
+								Action:  action,
+								Network: cidr,
+							})
+						} else {
+							Log.Warningf("unknown network %s", networkName)
+						}
 					}
 				}
 			}
-
-		} else {
-			Log.Warningf("No services found for %s, check the permissions for your token", svc)
 		}
 
 		// Add main service
