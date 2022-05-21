@@ -19,6 +19,11 @@ type Service struct {
 
 // RespondsTo returns if a service is allowed to talk to an IP
 func (s Service) RespondsTo(ip net.IP) bool {
+	if !s.ApplyACL {
+		Log.Debugf("Ignoring ACL for resolution of service %s from ip %s", s.Target, ip)
+		return true
+	}
+
 	Log.Debugf("Evaluating %d rules", len(s.ACL))
 	for _, acl := range s.ACL {
 		Log.Debugf("Evaluating %s", acl.Network)
