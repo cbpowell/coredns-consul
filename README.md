@@ -29,6 +29,7 @@ consul_catalog [TAGS...] {
     token TOKEN
     acl_metadata_tag META_TAG
     acl_zone ZONE_NAME ZONE_CIDR
+    acl_ignore_tag IGNORE_TAG
     service_proxy PROXY_TAG PROXY_SERVICE
     alias_tag ALIAS_TAG
     config_kv_path CONSUL_KV_PATH
@@ -38,8 +39,9 @@ consul_catalog [TAGS...] {
 
 * `endpoint` specifies the **URL** where to find consul catalog, by default `consul.service.consul:8500`.
 * `token` specifies the token to authenticate with the consul service.
-* `acl_metadata_tag` specifies the tag to read acl rules from, by default `coredns-acl`. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance on the corresponding service's metatag.
+* `acl_metadata_tag` specifies the Consul metadata tag to read acl rules from, by default `coredns-acl`. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance on the corresponding service's metatag.
 * `acl_zone` adds a zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
+* `acl_ignore_tag` If specified, services tagged with **IGNORE_TAG** will not have any ACLs enforced. This is also useful if metadata cannot be added to the Consul service definition (e.g. Vault).
 * `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead.
 * `alias_tag` If specified, services tagged with **ALIAS_TAG**=[comma-separated list of services aliases] will also be accessible via the specified aliases.
 * `config_kv_path` If specified, consul's kv store will be queried for **CONSUL_KV_PATH** and specified entries will be served before querying for catalog records. The value at **CONSUL_KV_PATH** must contain json in following this schema:
@@ -80,6 +82,9 @@ example.com {
         
         // Use coredns-consul metadata tag to define ACL (like "allow trusted")
         acl_metada_tag coredns-consul
+        
+        // Do not apply ACLs to services tagged with "coredns.ignoreacl"
+        acl_ignore_tag coredns.ignoreacl
         
         // Use traefik as service proxy, looking for same tag used to enable traefik
         service_proxy traefik.enable=true traefik
