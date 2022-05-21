@@ -88,7 +88,7 @@ func (c *Catalog) ServiceFor(name string) (svc *Service) {
 	var exists bool
 	c.RLock()
 	if svc, exists = c.staticEntries[name]; !exists {
-		Log.Debugf("Zone missing from static entries %s", name)
+		Log.Debugf("Zone not defined by static entries %s", name)
 		svc, _ = c.services[name]
 	}
 	c.RUnlock()
@@ -118,9 +118,13 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 
 	if len(c.Networks) > 0 {
 		ip := net.ParseIP(state.IP())
-		if !svc.RespondsTo(ip) {
-			Log.Warningf("Blocked resolution for service %s from ip %s", name, ip)
-			return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
+		if !svc.ApplyACL {
+			Log.Debugf("Ignoring ACLs for service %s, as specified", name)
+		} else {
+			if !svc.RespondsTo(ip) {
+				Log.Warningf("Blocked resolution for service %s from ip %s", name, ip)
+				return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
+			}
 		}
 	}
 
