@@ -127,6 +127,12 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 				}
 
 				networks[name] = network
+			case "acl_ignore_tag":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+				cc.ACLIgnoreTag = c.Val()
+				Log.Debugf("Found ACL-ignore tag config for tag %s", cc.ACLIgnoreTag)
 			case "service_proxy":
 				remaining := c.RemainingArgs()
 				if len(remaining) < 1 {

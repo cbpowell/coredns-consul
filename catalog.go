@@ -28,6 +28,7 @@ type Catalog struct {
 	sync.RWMutex
 	Endpoint         string
 	Tag              string
+	ACLIgnoreTag     string
 	AliasTag         string
 	services         map[string]*Service
 	staticEntries    map[string]*Service

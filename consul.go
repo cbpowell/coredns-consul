@@ -172,9 +172,13 @@ func (c *Catalog) FetchServices() error {
 	for svc, serviceTags := range svcs {
 		target := svc
 		exposed := false
+		acl_ignore := false
 		aliases := []string{}
 		for _, tag := range serviceTags {
 			switch tag {
+			case c.ACLIgnoreTag:
+				Log.Debugf("ACL rules will be ignored for %s", svc)
+				acl_ignore = true
 			case c.ProxyTag:
 				if c.ProxyTag != "" {
 					Log.Debugf("%s has a proxy tag, would provide proxy as target", svc)
@@ -218,8 +222,13 @@ func (c *Catalog) FetchServices() error {
 			metadata := hydratedServices[0].ServiceMeta
 			acl, exists := metadata[c.MetadataTag]
 			if !exists {
-				Log.Warningf("No ACL found for %s", svc)
-				continue
+				if acl_ignore {
+					Log.Infof("Configured to ignore ACL for %s", svc)
+				} else {
+					Log.Warningf("No ACL found for %s, will not expose", svc)
+					// Continue to next service
+					continue
+				}
 			}
 
 			Log.Debugf("Parsing ACL for %s : %s", svc, acl)
