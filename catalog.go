@@ -118,7 +118,7 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 
 	if len(c.Networks) > 0 {
 		ip := net.ParseIP(state.IP())
-		if !svc.RespondsTo(ip) {
+		if svc.ApplyACL && !svc.RespondsTo(ip) {
 			Log.Warningf("Blocked resolution for service %s from ip %s", name, ip)
 			return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
 		}

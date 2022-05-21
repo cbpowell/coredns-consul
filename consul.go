@@ -214,8 +214,9 @@ func (c *Catalog) FetchServices() error {
 		}
 
 		service := &Service{
-			Target: fmt.Sprintf("%s.service.consul.", target),
-			ACL:    []*ServiceACL{},
+			Target:   fmt.Sprintf("%s.service.consul.", target),
+			ACL:      []*ServiceACL{},
+      ApplyACL: true
 		}
 
 		if len(hydratedServices) < 1 {
@@ -227,6 +228,7 @@ func (c *Catalog) FetchServices() error {
 				// No ACL for service
 				if acl_ignore {
 					Log.Infof("Configured to ignore ACL for service %s", svc)
+          service.ApplyACL = false
 				} else {
 					Log.Warningf("No ACL found for service %s, will not expose", svc)
 					// Continue to next service
