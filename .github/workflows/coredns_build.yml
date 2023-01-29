@@ -23,7 +23,7 @@ jobs:
       with:
         repository: coredns/coredns
         path: coredns
-        ref: ${RELEASE:1}
+        ref: v1.10.0
         
     - name: Move plugin configuration
       run: cp -rf plugin.cfg coredns/plugin.cfg
