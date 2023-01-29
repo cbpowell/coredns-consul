@@ -28,6 +28,14 @@ jobs:
     - name: Move plugin configuration
       run: cp -rf plugin.cfg coredns/plugin.cfg
       
+    - name: Setup build
+      working-directory: ./coredns
+      run: |
+        go mod tidy
+        go get github.com/cbpowell/coredns-consul
+        go mod tidy
+        go generate
+      
     - name: Build CoreDNS
       working-directory: ./coredns
       run: make
