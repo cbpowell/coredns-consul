@@ -10,40 +10,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container: golang:1.18
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.18
-
-    - name: Clone CoreDNS
-      uses: actions/checkout@v3
-      with:
-        repository: coredns/coredns
-        path: coredns
-        ref: v1.10.0
+      - name: Clone CoreDNS
+        uses: actions/checkout@v3
+        with:
+          repository: coredns/coredns
+          path: ./coredns
+          ref: v1.10.0
         
-    - name: Move plugin configuration
-      run: cp -rf plugin.cfg coredns/plugin.cfg
+      - name: Move plugin configuration
+        run: cp -rf plugin.cfg coredns/plugin.cfg
+
+      - name: Build CoreDNS
+        working-directory: ./coredns
+        run: make
       
-    - name: Setup build
-      working-directory: ./coredns
-      run: |
-        go get github.com/cbpowell/coredns-consul
-        go mod tidy -compat=1.17
-        go generate
+      - name: Tar file
+        working-directory: ./coredns
+        run: tar -czvf coredns.tar.gz coredns
       
-    - name: Build CoreDNS
-      working-directory: ./coredns
-      run: make
-      
-    - name: Tar file
-      working-directory: ./coredns
-      run: tar -czvf coredns.tar.gz coredns
-      
-    - name: Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: coredns.tar.gz
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: coredns.tar.gz
