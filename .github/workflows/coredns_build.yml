@@ -10,10 +10,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     container: golang:1.18
     steps:
       - if: ${{ env.ACT }}
-        name: Hack container for local development
+        name: Setup container for local development
         run: |
           curl -fsSL https://deb.nodesource.com/setup_19.x | bash - &&\
           apt-get install -y nodejs
