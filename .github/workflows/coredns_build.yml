@@ -31,9 +31,8 @@ jobs:
     - name: Setup build
       working-directory: ./coredns
       run: |
-        go mod tidy
         go get github.com/cbpowell/coredns-consul
-        go mod tidy
+        go mod tidy -compat=1.17
         go generate
       
     - name: Build CoreDNS
