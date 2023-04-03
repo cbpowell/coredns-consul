@@ -1,8 +1,11 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 	"time"
@@ -10,15 +13,15 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-var watchTimeout = time.Duration(10 * time.Minute)
+var watchTimeout = 10 * time.Minute
 
-// ClientCatalog is implemented by github.com/hashicorp/consul/api.Catalog
+// ClientCatalog is implemented by github.com/hashicorp/consul/api.Catalog.
 type ClientCatalog interface {
 	Service(string, string, *api.QueryOptions) ([]*api.CatalogService, *api.QueryMeta, error)
 	Services(*api.QueryOptions) (map[string][]string, *api.QueryMeta, error)
 }
 
-// KVClient is implemented by github.com/hashicorp/consul/api.Catalog
+// KVClient is implemented by github.com/hashicorp/consul/api.Catalog.
 type KVClient interface {
 	Get(string, *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error)
 }
@@ -28,12 +31,16 @@ type KVEntries struct {
 	ACL    []string
 }
 
-// CreateClient initializes the consul catalog client
-func CreateClient(endpoint string, token string) (catalog ClientCatalog, kv KVClient, err error) {
+// CreateClient initializes the consul catalog client.
+func CreateClient(scheme, endpoint, token string) (catalog ClientCatalog, kv KVClient, err error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = endpoint
 	if token != "" {
 		cfg.Token = token
+	}
+
+	if scheme == "https" {
+		cfg.Scheme = "https"
 	}
 
 	client, err := api.NewClient(cfg)
@@ -93,30 +100,19 @@ func (c *Catalog) FetchConfig() error {
 				Log.Warningf("Ignoring service %s. Requested service proxy but none is configured", name)
 				continue
 			}
-			target = c.ProxyService
 		}
 
 		service := &Service{
-			Target: fmt.Sprintf("%s.service.consul.", target),
+			Name:   name,
+			Target: target,
 			ACL:    []*ServiceACL{},
 		}
 
-		for _, rule := range entry.ACL {
-			ruleParts := strings.SplitN(rule, " ", 2)
-			if len(ruleParts) != 2 {
-				Log.Warningf("Ignoring service. Failed parsing acl rule <%s> for service %s", rule, name)
+		if c.MetadataTag != "" {
+			err := c.parseACL(service, entry.ACL)
+			if err != nil {
+				Log.Warningf("Ignoring service %s. Could not parse ACL: %s", name, err)
 				continue
-			}
-			action := ruleParts[0]
-			for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
-				if cidr, ok := c.Networks[networkName]; ok {
-					service.ACL = append(service.ACL, &ServiceACL{
-						Action:  action,
-						Network: cidr,
-					})
-				} else {
-					Log.Warningf("unknown network %s", networkName)
-				}
 			}
 		}
 
@@ -135,7 +131,35 @@ func (c *Catalog) FetchConfig() error {
 	return nil
 }
 
-// FetchServices populates zones
+func (c *Catalog) parseACLString(svc *Service, acl string) error {
+	aclRules := regexp.MustCompile(`;\s*`).Split(acl, -1)
+	return c.parseACL(svc, aclRules)
+}
+
+func (c *Catalog) parseACL(svc *Service, rules []string) error {
+	Log.Debugf("Parsing ACL for %s: %s", svc.Name, rules)
+	for _, rule := range rules {
+		ruleParts := strings.SplitN(rule, " ", 2)
+		if len(ruleParts) != 2 {
+			return fmt.Errorf("could not parse acl rule <%s>", rule)
+		}
+		action := ruleParts[0]
+		for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
+			if cidr, ok := c.Networks[networkName]; ok {
+				svc.ACL = append(svc.ACL, &ServiceACL{
+					Action:  action,
+					Network: cidr,
+				})
+			} else {
+				return fmt.Errorf("unknown network %s", networkName)
+			}
+		}
+	}
+
+	return nil
+}
+
+// FetchServices populates zones.
 func (c *Catalog) FetchServices() error {
 	c.RLock()
 	lastIndex := c.lastCatalogIndex
@@ -214,15 +238,22 @@ func (c *Catalog) FetchServices() error {
 		}
 
 		service := &Service{
-			Target:   fmt.Sprintf("%s.service.consul.", target),
-			ACL:      []*ServiceACL{},
-			ApplyACL: true,
+			Name:      svc,
+			Target:    target,
+			ACL:       []*ServiceACL{},
+			Addresses: []net.IP{},
+      ApplyACL:  true,
 		}
 
-		if len(hydratedServices) < 1 {
-			Log.Warningf("No services found for %s, check the permissions for your token", svc)
-		} else {
+		if len(hydratedServices) > 0 {
+			for _, svc := range hydratedServices {
+				service.Addresses = append(service.Addresses, net.ParseIP(svc.Address))
+			}
 			metadata := hydratedServices[0].ServiceMeta
+			if c.MetadataTag != "" {
+				acl, exists := metadata[c.MetadataTag]
+				if !exists {
+					Log.Warningf("No ACL found for %s", svc)
 			acl, exists := metadata[c.MetadataTag]
 			if !exists {
 				// No ACL for service
@@ -234,30 +265,13 @@ func (c *Catalog) FetchServices() error {
 					// Continue to next service
 					continue
 				}
-			} else {
-				// Parse ACLs
-				Log.Debugf("Parsing ACL for %s : %s", svc, acl)
 
-				aclRules := regexp.MustCompile(`;\s*`).Split(acl, -1)
-				for _, rule := range aclRules {
-					ruleParts := strings.SplitN(rule, " ", 2)
-					if len(ruleParts) != 2 {
-						Log.Warningf("Ignoring service. Failed parsing acl rule <%s> for service %s", rule, svc)
-						continue
-					}
-					action := ruleParts[0]
-					for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
-						if cidr, ok := c.Networks[networkName]; ok {
-							service.ACL = append(service.ACL, &ServiceACL{
-								Action:  action,
-								Network: cidr,
-							})
-						} else {
-							Log.Warningf("unknown network %s", networkName)
-						}
-					}
+				if err := c.parseACLString(service, acl); err != nil {
+					Log.Warningf("Ignoring service %s: %s", service.Name, err)
 				}
 			}
+		} else {
+			Log.Warningf("No services found for %s, check the permissions for your token", svc)
 		}
 
 		// Add main service
