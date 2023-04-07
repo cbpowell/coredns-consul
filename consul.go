@@ -243,7 +243,7 @@ func (c *Catalog) FetchServices() error {
 			Target:    target,
 			ACL:       []*ServiceACL{},
 			Addresses: []net.IP{},
-      ApplyACL:  true,
+			ApplyACL:  true,
 		}
 
 		if len(hydratedServices) > 0 {
@@ -254,17 +254,15 @@ func (c *Catalog) FetchServices() error {
 			if c.MetadataTag != "" {
 				acl, exists := metadata[c.MetadataTag]
 				if !exists {
-					Log.Warningf("No ACL found for %s", svc)
-			acl, exists := metadata[c.MetadataTag]
-			if !exists {
-				// No ACL for service
-				if acl_ignore {
-					Log.Infof("Configured to ignore ACL for service %s", svc)
-					service.ApplyACL = false
-				} else {
-					Log.Warningf("No ACL found for service %s, will not expose", svc)
-					// Continue to next service
-					continue
+					// No ACL for service
+					if acl_ignore {
+						Log.Infof("Configured to ignore ACL for service %s", svc)
+						service.ApplyACL = false
+					} else {
+						Log.Warningf("No ACL found for service %s, will not expose", svc)
+						// Continue to next service
+						continue
+					}
 				}
 
 				if err := c.parseACLString(service, acl); err != nil {
