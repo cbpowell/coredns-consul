@@ -26,6 +26,8 @@ With only the plugin specified, the *consul_catalog* plugin will default to the 
 ```
 consul_catalog [TAGS...] {
     endpoint URL
+    # to enable tls encryption, might need your cluster's CA certificates installed!
+    scheme https
     token TOKEN
     acl_metadata_tag META_TAG
     acl_zone ZONE_NAME ZONE_CIDR
@@ -102,6 +104,8 @@ example.com {
         ttl 10m
     }
 
+    # if a SOA is specified in this file, it'll be added
+    # to responses from consul services
     file zones/example.com
 }
 

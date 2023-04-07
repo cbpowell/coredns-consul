@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
@@ -23,8 +25,10 @@ func setup(c *caddy.Controller) error {
 		return plugin.Error("Failed to parse", err)
 	}
 
-	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
+	config := dnsserver.GetConfig(c)
+	config.AddPlugin(func(next plugin.Handler) plugin.Handler {
 		catalog.Next = next
+		catalog.Zone = config.Zone
 		return catalog
 	})
 
@@ -47,7 +51,7 @@ func setup(c *caddy.Controller) error {
 				err := backoff.RetryNotify(catalog.FetchServices, backoff.NewExponentialBackOff(), onUpdateError)
 
 				if err != nil {
-					plugin.Error("Failed to obtain services from catalog", err)
+					Log.Error(plugin.Error("Failed to obtain services from catalog", err))
 					continue
 				}
 			}
@@ -64,7 +68,7 @@ func setup(c *caddy.Controller) error {
 					err := backoff.RetryNotify(catalog.FetchConfig, backoff.NewExponentialBackOff(), onUpdateKVError)
 
 					if err != nil {
-						plugin.Error("Failed to obtain kv config", err)
+						Log.Error(plugin.Error("Failed to obtain kv config", err))
 						continue
 					}
 				}
@@ -95,6 +99,11 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 					return nil, c.ArgErr()
 				}
 				cc.Endpoint = c.Val()
+			case "scheme":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+				cc.Scheme = c.Val()
 			case "token":
 				if !c.NextArg() {
 					return nil, c.ArgErr()
@@ -162,7 +171,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 
 	cc.Networks = networks
 
-	catalogClient, kvClient, err := CreateClient(cc.Endpoint, token)
+	catalogClient, kvClient, err := CreateClient(cc.Scheme, cc.Endpoint, token)
 	if err != nil {
 		return nil, c.Errf("Could not create consul client: %v", err)
 	}
